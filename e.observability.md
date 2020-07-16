@@ -47,7 +47,7 @@ kubectl delete -f pod.yaml
 </p>
 </details>
 
-### Modify the pod.yaml file so that liveness probe starts kicking in after 5 seconds whereas the period of probing would be 10 seconds. Run it, check the probe, delete it.
+### Modify the pod.yaml file so that liveness probe starts kicking in after 5 seconds whereas the interval between probes would be 5 seconds. Run it, check the probe, delete it.
 
 <details><summary>show</summary>
 <p>
@@ -72,7 +72,7 @@ spec:
     resources: {}
     livenessProbe: 
       initialDelaySeconds: 5 # add this line
-      periodSeconds: 10 # add this line as well
+      periodSeconds: 5 # add this line as well
       exec:
         command:
         - ls
@@ -115,7 +115,7 @@ spec:
     name: nginx
     resources: {}
     ports:
-      - containerPort: 80
+      - containerPort: 80 # Note: Readiness probes runs on the container during its whole lifecycle. Since nginx exposes 80, containerPort: 80 is not required for readiness to work.
     readinessProbe: # declare the readiness probe
       httpGet: # add this line
         path: / #
@@ -184,7 +184,7 @@ kubectl delete po busybox --force --grace-period=0
 </p>
 </details>
 
-### Get CPU/memory utilization for nodes (heapster must be running)
+### Get CPU/memory utilization for nodes ([metrics-server](https://github.com/kubernetes-incubator/metrics-server) must be running)
 
 <details><summary>show</summary>
 <p>

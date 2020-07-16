@@ -2,6 +2,7 @@
 # Pod design (20%)
 
 ## Labels and annotations
+kubernetes.io > Documentation > Concepts > Overview > [Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)
 
 ### Create 3 pods with names nginx1,nginx2,nginx3. All of them should have the label app=v1
 
@@ -48,6 +49,8 @@ kubectl label po nginx2 app=v2 --overwrite
 
 ```bash
 kubectl get po -L app
+# or
+kubectl get po --label-columns=app
 ```
 
 </p>
@@ -62,6 +65,8 @@ kubectl get po -L app
 kubectl get po -l app=v2
 # or
 kubectl get po -l 'app in (v2)'
+# or
+kubectl get po --selector=app=v2
 ```
 
 </p>
@@ -100,7 +105,7 @@ spec:
     - name: cuda-test
       image: "k8s.gcr.io/cuda-vector-add:v0.1"
   nodeSelector: # add this
-    accelerator: nvidia-tesla-p100 # the slection label
+    accelerator: nvidia-tesla-p100 # the selection label
 ```
 
 You can easily find out where in the YAML it should be placed by:
@@ -112,7 +117,7 @@ kubectl explain po.spec
 </p>
 </details>
 
-### Annotate pods nginx1, nginx2, ngingx3 with "description='my description'" value
+### Annotate pods nginx1, nginx2, nginx3 with "description='my description'" value
 
 <details><summary>show</summary>
 <p>
@@ -120,6 +125,10 @@ kubectl explain po.spec
 
 ```bash
 kubectl annotate po nginx1 nginx2 nginx3 description='my description'
+
+#or
+
+kubectl annotate po nginx{1..3} description='my description'
 ```
 
 </p>
@@ -134,7 +143,7 @@ kubectl annotate po nginx1 nginx2 nginx3 description='my description'
 kubectl describe po nginx1 | grep -i 'annotations'
 ```
 
-As an alternative to using `| grep` you can use jsonPath like `-o jsonpath='{.metadata.annotations}{"\n"}'`
+As an alternative to using `| grep` you can use jsonPath like `kubectl get po nginx -o jsonpath='{.metadata.annotations}{"\n"}'`
 
 </p>
 </details>
@@ -173,13 +182,7 @@ kubernetes.io > Documentation > Concepts > Workloads > Controllers > [Deployment
 <p>
 
 ```bash
-kubectl run nginx --image=nginx:1.7.8 --replicas=2 --port=80
-```
-
-**However**, `kubectl run` for Deployments is Deprecated and will be removed in a future version. What you can do is:
-
-```bash
-kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run -o yaml > deploy.yaml
+kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run=client -o yaml > deploy.yaml
 vi deploy.yaml
 # change the replicas field from 1 to 2
 # add this section to the container spec and save the deploy.yaml file
@@ -191,7 +194,7 @@ kubectl apply -f deploy.yaml
 or, do something like:
 
 ```bash
-kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run -o yaml | sed 's/replicas: 1/replicas: 2/g'  | sed 's/image: nginx:1.7.8/image: nginx:1.7.8\n        ports:\n        - containerPort: 80/g' | kubectl apply -f -
+kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run=client -o yaml | sed 's/replicas: 1/replicas: 2/g'  | sed 's/image: nginx:1.7.8/image: nginx:1.7.8\n        ports:\n        - containerPort: 80/g' | kubectl apply -f -
 ```
 
 </p>
@@ -203,7 +206,7 @@ kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run -o yaml | sed 's
 <p>
 
 ```bash
-kubectl get deploy nginx --export -o yaml
+kubectl get deploy nginx -o yaml
 ```
 
 </p>
@@ -220,7 +223,7 @@ kubectl describe deploy nginx # you'll see the name of the replica set on the Ev
 kubectl get rs -l run=nginx # if you created deployment by 'run' command
 kubectl get rs -l app=nginx # if you created deployment by 'create' command
 # you could also just do kubectl get rs
-kubectl get rs nginx-7bf7478b77 --export -o yaml
+kubectl get rs nginx-7bf7478b77 -o yaml
 ```
 
 </p>
@@ -236,7 +239,7 @@ kubectl get po # get all the pods
 # OR you can find pods directly by:
 kubectl get po -l run=nginx # if you created deployment by 'run' command
 kubectl get po -l app=nginx # if you created deployment by 'create' command
-kubectl get po nginx-7bf7478b77-gjzp8 -o yaml --export
+kubectl get po nginx-7bf7478b77-gjzp8 -o yaml
 ```
 
 </p>
@@ -345,13 +348,13 @@ kubectl rollout status deploy nginx # Everything should be OK
 </p>
 </details>
 
-### Check the details of the third revision (number 3)
+### Check the details of the fourth revision (number 4)
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl rollout history deploy nginx --revision=3 # You'll also see the wrong image displayed here
+kubectl rollout history deploy nginx --revision=4 # You'll also see the wrong image displayed here
 ```
 
 </p>
@@ -433,14 +436,16 @@ kubectl rollout history deploy nginx --revision=6 # insert the number of your la
 ```bash
 kubectl delete deploy nginx
 kubectl delete hpa nginx
-```
 
+#Or
+kubectl delete deploy/nginx hpa/nginx
+```
 </p>
 </details>
 
 ## Jobs
 
-### Create a job with image perl that runs default command with arguments "perl -Mbignum=bpi -wle 'print bpi(2000)'"
+### Create a job with image perl that runs the command with arguments "perl -Mbignum=bpi -wle 'print bpi(2000)'"
 
 <details><summary>show</summary>
 <p>
@@ -527,6 +532,48 @@ kubectl logs job/busybox
 kubectl delete job busybox
 ```
 
+</p>
+</details>
+
+### Create a job but ensure that it will be automatically terminated by kubernetes if it takes more than 30 seconds to execute
+
+<details><summary>show</summary>
+<p>
+  
+```bash
+kubectl create job busybox --image=busybox --dry-run -o yaml -- /bin/sh -c 'while true; do echo hello; sleep 10;done' > job.yaml
+vi job.yaml
+```
+  
+Add job.spec.activeDeadlineSeconds=30
+
+```bash
+apiVersion: batch/v1
+kind: Job
+metadata:
+  creationTimestamp: null
+  labels:
+    run: busybox
+  name: busybox
+spec:
+  activeDeadlineSeconds: 30 # add this line
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: busybox
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - while true; do echo hello; sleep 10;done
+        image: busybox
+        name: busybox
+        resources: {}
+      restartPolicy: OnFailure
+status: {}
+```
 </p>
 </details>
 
@@ -671,6 +718,50 @@ kubectl get po --show-labels # observe that the pods have a label that mentions 
 kubectl logs busybox-1529745840-m867r
 # Bear in mind that Kubernetes will run a new job/pod for each new cron job
 kubectl delete cj busybox
+```
+
+</p>
+</details>
+
+### Create a cron job with image busybox that runs every minutes and writes 'date; echo Hello from the Kubernetes cluster' to standard output. The cron job should be terminated if it takes more than 17 seconds to execute.
+
+<details><summary>show</summary>
+<p>
+
+```bash
+kubectl create cronjob time-limited-job --image=busybox --restart=Never --dry-run --schedule="* * * * *" -o yaml -- /bin/sh -c 'date; echo Hello from the Kubernetes cluster' > time-limited-job.yaml
+vi time-limited-job.yaml
+```
+Add job.spec.activeDeadlineSeconds=17
+
+```bash
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  creationTimestamp: null
+  name: time-limited-job
+spec:
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+      name: time-limited-job
+    spec:
+      activeDeadlineSeconds: 17 # add this line
+      template:
+        metadata:
+          creationTimestamp: null
+        spec:
+          containers:
+          - args:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+            image: busybox
+            name: time-limited-job
+            resources: {}
+          restartPolicy: Never
+  schedule: '* * * * *'
+status: {}
 ```
 
 </p>
